@@ -1,6 +1,21 @@
-from flask import Flask, request, render_template, jsonify, send_file
 import subprocess
 import sys
+
+def install(package):
+    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+
+# Verifica se o g2pk e unidecode estão instalados, caso contrário, instala
+try:
+    import g2pk
+except ImportError:
+    install('g2pk')
+
+try:
+    from unidecode import unidecode
+except ImportError:
+    install('unidecode')
+
+from flask import Flask, request, render_template, jsonify, send_file
 import torch
 import torchaudio
 from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
@@ -16,8 +31,8 @@ import pandas as pd
 from gtts import gTTS
 from WordMetrics import edit_distance_python2
 from WordMatching import get_best_mapped_words
-import logging
-app = Flask(__name__)
+
+app = Flask(__name__, template_folder="./templates", static_folder="./static")
 
 # Load the French SST Model
 model_name = "facebook/wav2vec2-large-xlsr-53-french"
@@ -29,8 +44,7 @@ epi = epitran.Epitran('fra-Latn')
 
 def get_pronunciation(word):
     return epi.transliterate(word)
-    
-logging.basicConfig(level=logging.INFO)
+
 # Mapeamento ajustado de fonemas franceses para português
 french_to_portuguese_phonemes = {
     'ɑ̃': 'an',   # como em 'pão'
@@ -85,8 +99,6 @@ def convert_pronunciation_to_portuguese(pronunciation):
                     i += length
                     break
             if not match:
-                # Adicione logs para depuração
-                logging.info(f"Unrecognized phoneme: {word[i]}")
                 mapped_word.append(unidecode(word[i]))
                 i += 1
         pronunciation_mapped.append(''.join(mapped_word))
@@ -99,15 +111,9 @@ def normalize_text(text):
     return text
 
 def transliterate_and_convert(word):
-    try:
-        pronunciation = get_pronunciation(word)
-        logging.info(f"Pronunciation for {word}: {pronunciation}")
-        pronunciation_pt = convert_pronunciation_to_portuguese(pronunciation)
-        logging.info(f"Portuguese pronunciation for {word}: {pronunciation_pt}")
-        return pronunciation_pt
-    except Exception as e:
-        logging.error(f"Error in transliterate_and_convert for word {word}: {e}")
-        return ""
+    pronunciation = get_pronunciation(word)
+    pronunciation_pt = convert_pronunciation_to_portuguese(pronunciation)
+    return pronunciation_pt
 
 # Load sentences from pickle file and categorize them
 with open('data_de_en_fr.pickle', 'rb') as f:
@@ -218,16 +224,10 @@ def upload():
 
 @app.route('/pronounce', methods=['POST'])
 def pronounce():
-    try:
-        text = request.form['text']
-        logging.info(f"Received text for pronunciation: {text}")
-        words = text.split()
-        pronunciations = [transliterate_and_convert(word) for word in words]
-        logging.info(f"Pronunciations: {pronunciations}")
-        return jsonify({'pronunciations': ' '.join(pronunciations)})
-    except Exception as e:
-        logging.error(f"Error in /pronounce: {e}")
-        return jsonify({"error": str(e)}), 500
+    text = request.form['text']
+    words = text.split()
+    pronunciations = [transliterate_and_convert(word) for word in words]
+    return jsonify({'pronunciations': ' '.join(pronunciations)})
 
 @app.route('/speak', methods=['POST'])
 def speak():

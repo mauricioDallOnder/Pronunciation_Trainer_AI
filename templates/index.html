@@ -1,26 +1,365 @@
-<!doctype html>
-<html lang="en">
-  <head>
-      <meta charset="utf-8">
-      <meta name="description" content="alphasec">
-      <meta name="author" content="alphasec">
-      <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-      <title>alphasec</title>
-      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css" integrity="sha384-xOolHFLEh07PJGoPkLv1IbcEPTNtaed2xpHsD9ESMhqIYd0nLMwNLD69Npy4HI+N" crossorigin="anonymous">
-      <link rel="stylesheet" href="static/css/styles.css">
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:500&display=swap">
-      <link rel="icon" href="static/favicon.ico" type="image/x-icon">
-  </head>
-  <body>
-    <div class="row">
-      <h1 class="h1">alphasec</h1>
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>Treinador de Pronúncia IA</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet"
+          integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"></script>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        body {
+            background-color: #4158D0;
+            max-width: 90%;
+            margin: auto;
+            padding: 20px;
+            background-image: url('https://firebasestorage.googleapis.com/v0/b/mauriciodallonder-64688.appspot.com/o/bandeira.jpg?alt=media&token=93383751-b852-4b4a-89e9-82037c09f9da');
+            background-size: cover;
+            background-attachment: fixed;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 20px;
+            padding: 20px;
+            margin-top: 20px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .main-content {
+            flex: 0 0 65%;
+            height: fit-content;
+        }
+        .feedback-box {
+            flex: 0 0 30%;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #3b5998;
+            margin-left: 20px;
+        }
+        .feedback-box p {
+            margin: 0;
+        }
+        .word {
+            cursor: pointer;
+            margin-right: 5px;
+            padding: 5px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+        }
+        .separator {
+            color: red;
+            margin-right: 5px;
+        }
+        .incorrect {
+            color: red;
+        }
+        .correct {
+            color: green;
+        }
+        .btn-speak {
+            display: block;
+            margin-top: 10px;
+            width: 100%;
+        }
+        .recording {
+            color: red;
+        }
+        .uploading-message {
+            display: none;
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="main-content">
+            <h1 class="mb-4">Treinador de Pronúncia IA</h1>
+            <div class="mb-3">
+                <label for="text" class="form-label">Escreva ou gere um texto abaixo:</label>
+                <textarea class="form-control" id="text" name="text"></textarea>
+            </div>
+            <div class="mb-3">
+                <label for="difficulty" class="form-label">Selecione a Dificuldade:</label>
+                <select class="form-select" id="difficulty" name="difficulty">
+                    <option value="easy">Fácil</option>
+                    <option value="medium">Médio</option>
+                    <option value="hard">Difícil</option>
+                </select>
+            </div>
+            <button class="btn btn-danger" id="recordButton" onclick="toggleRecording()">
+                <i class="material-icons" id="recordIcon">mic</i>
+            </button>
+            <button class="btn btn-secondary" onclick="speakText()">Ouvir Texto</button>
+            <button class="btn btn-success" onclick="generateSentence()">Gerar Frase</button>
+            <div class="uploading-message" id="uploadingMessage">Enviando áudio... Aguarde.</div>
+            <div class="pronunciation-feedback mt-4">
+                <h3>Pronúncia em português (Aproximadamente):</h3>
+                <p id="pronunciation"></p>
+            </div>
+            <div class="result mt-4">
+                <h3>Feedback:</h3>
+                <p>Taxa de Acerto na Pronuncia: <span id="ratio"></span>%</p>
+                <div class="diff" id="diff"></div>
+            </div>
+            <div id="audioContainer" class="mt-4"></div>
+        </div>
+        <div class="feedback-box" id="feedbackBox">
+            <p id="feedbackContent">Clique em uma palavra para ver sua pronúncia.</p>
+        </div>
     </div>
-    <div class="row">
-      <div>
-      </div>
-    </div>
-    <div class="row">
-      <span class="text-muted small">alphasec © 2024. All rights reserved.</span>
-    </div>
-  </body>
+
+    <script>
+        document.getElementById('text').addEventListener('input', function () {
+            fetchPronunciation(this.value);
+        });
+
+        function fetchPronunciation(text) {
+            fetch('/pronounce', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: 'text=' + encodeURIComponent(text)
+            })
+            .then(response => response.json())
+            .then(data => {
+                const pronunciationHtml = data.pronunciations.split(' || ').map(word => `<span class="word">${word}</span>`).join('<span class="separator">||</span>');
+                document.getElementById('pronunciation').innerHTML = pronunciationHtml;
+            });
+        }
+
+        function uploadAudio() {
+            let audioInput = document.getElementById('audio');
+            let textInput = document.getElementById('text');
+            let formData = new FormData();
+            formData.append('audio', audioInput.files[0]);
+            formData.append('text', textInput.value);
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('ratio').innerText = (data.ratio * 100).toFixed(2);
+                document.getElementById('diff').innerHTML = data.diff_html;
+                window.pronunciations = data.pronunciations;  // Save pronunciations for later use
+            });
+        }
+
+        function showPronunciation(word) {
+            let pronunciation = window.pronunciations[word];
+            if (pronunciation) {
+                document.getElementById('feedbackContent').innerHTML = `
+                    <strong>Palavra:</strong> ${word}<br>
+                    <strong>Pronúncia Correta:</strong> ${pronunciation.correct}<br>
+                    <strong>Sua Pronúncia:</strong> ${pronunciation.user || 'N/A'}
+                    <button class="btn btn-sm btn-info btn-speak" onclick="speakWord('${word}')">Ouvir Pronuncia da Palavra</button>
+                `;
+            }
+        }
+
+        function speakText() {
+            let text = document.getElementById('text').value;
+            fetch('/speak', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: 'text=' + encodeURIComponent(text)
+            })
+            .then(response => response.blob())
+            .then(blob => {
+                let url = URL.createObjectURL(blob);
+                let audio = new Audio(url);
+                audio.play();
+            });
+        }
+
+        function speakWord(word) {
+            fetch('/speak', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: 'text=' + encodeURIComponent(word)
+            })
+            .then(response => response.blob())
+            .then(blob => {
+                let url = URL.createObjectURL(blob);
+                let audio = new Audio(url);
+                audio.play();
+            });
+        }
+
+        let mediaRecorder;
+        let recordedBlobs;
+        let isRecording = false;
+
+        function toggleRecording() {
+            if (isRecording) {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        }
+
+        function startRecording() {
+            recordedBlobs = [];
+            let options = { mimeType: 'audio/webm' };
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                options = { mimeType: 'audio/webm;codecs=opus' };
+                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                    options = { mimeType: 'audio/ogg;codecs=opus' };
+                    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                        options = { mimeType: '' };
+                    }
+                }
+            }
+
+            navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+                mediaRecorder = new MediaRecorder(stream, options);
+
+                mediaRecorder.onstop = (event) => {
+                    const blob = new Blob(recordedBlobs, { type: 'audio/webm' });
+                    const url = window.URL.createObjectURL(blob);
+                    const audioContainer = document.getElementById('audioContainer');
+                    audioContainer.innerHTML = '';
+                    const audio = document.createElement('audio');
+                    audio.controls = true;
+                    audio.src = url;
+                    audioContainer.appendChild(audio);
+                    uploadRecording(blob);
+                };
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data && event.data.size > 0) {
+                        recordedBlobs.push(event.data);
+                    }
+                };
+
+                mediaRecorder.start();
+                document.getElementById('recordButton').classList.add('recording');
+                document.getElementById('recordIcon').innerText = 'pause';
+                isRecording = true;
+            });
+        }
+
+        function stopRecording() {
+            mediaRecorder.stop();
+            document.getElementById('recordButton').classList.remove('recording');
+            document.getElementById('recordIcon').innerText = 'mic';
+            isRecording = false;
+        }
+
+        function uploadRecording(blob) {
+            document.getElementById('uploadingMessage').style.display = 'block';
+            document.getElementById('recordButton').disabled = true;
+
+            convertToWav(blob).then(wavBlob => {
+                let textInput = document.getElementById('text');
+                let formData = new FormData();
+                formData.append('audio', wavBlob);
+                formData.append('text', textInput.value);
+
+                fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('ratio').innerText = (data.ratio * 100).toFixed(2);
+                    document.getElementById('diff').innerHTML = data.diff_html;
+                    window.pronunciations = data.pronunciations;  // Save pronunciations for later use
+                    document.getElementById('uploadingMessage').style.display = 'none';
+                    document.getElementById('recordButton').disabled = false;
+                });
+            });
+        }
+
+        async function convertToWav(blob) {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const arrayBuffer = await blob.arrayBuffer();
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+            const wavBuffer = audioBufferToWav(audioBuffer);
+            return new Blob([wavBuffer], { type: 'audio/wav' });
+        }
+
+        function audioBufferToWav(buffer) {
+            const numOfChan = buffer.numberOfChannels,
+                  length = buffer.length * numOfChan * 2 + 44,
+                  bufferArr = new ArrayBuffer(length),
+                  view = new DataView(bufferArr),
+                  channels = [],
+                  sampleRate = buffer.sampleRate;
+            let offset = 0,
+                pos = 0;
+
+            function setUint16(data) {
+                view.setUint16(pos, data, true);
+                pos += 2;
+            }
+
+            function setUint32(data) {
+                view.setUint32(pos, data, true);
+                pos += 4;
+            }
+
+            setUint32(0x46464952);  // "RIFF"
+            setUint32(length - 8);  // file length - 8
+            setUint32(0x45564157);  // "WAVE"
+
+            setUint32(0x20746d66);  // "fmt " chunk
+            setUint32(16);          // length = 16
+            setUint16(1);           // PCM (uncompressed)
+            setUint16(numOfChan);
+            setUint32(sampleRate);
+            setUint32(sampleRate * 2 * numOfChan);  // avg. bytes/sec
+            setUint16(numOfChan * 2);               // block-align
+            setUint16(16);          // 16-bit (hardcoded in this demo)
+
+            setUint32(0x61746164);  // "data" - chunk
+            setUint32(length - pos - 4);  // chunk length
+
+            for (let i = 0; i < buffer.numberOfChannels; i++)
+                channels.push(buffer.getChannelData(i));
+
+            while (pos < length) {
+                for (let i = 0; i < numOfChan; i++) {  // interleave channels
+                    const sample = Math.max(-1, Math.min(1, channels[i][offset])); // clamp
+                    view.setInt16(pos, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true); // convert to PCM
+                    pos += 2;
+                }
+                offset++; // next source sample
+            }
+
+            return bufferArr;
+        }
+
+        function generateSentence() {
+            let difficulty = document.getElementById('difficulty').value;
+            fetch('/get_sentence', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: 'difficulty=' + encodeURIComponent(difficulty)
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('text').value = data.fr_sentence;
+                fetchPronunciation(data.fr_sentence);
+            });
+        }
+
+        document.addEventListener('click', function(event) {
+            if (event.target.classList.contains('word')) {
+                showPronunciation(event.target.innerText);
+            }
+        });
+    </script>
+</body>
 </html>

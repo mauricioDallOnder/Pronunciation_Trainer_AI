@@ -16,7 +16,7 @@ import pandas as pd
 from gtts import gTTS
 from WordMetrics import edit_distance_python2
 from WordMatching import get_best_mapped_words
-
+import logging
 app = Flask(__name__)
 
 # Load the French SST Model
@@ -29,7 +29,8 @@ epi = epitran.Epitran('fra-Latn')
 
 def get_pronunciation(word):
     return epi.transliterate(word)
-
+    
+logging.basicConfig(level=logging.INFO)
 # Mapeamento ajustado de fonemas franceses para português
 french_to_portuguese_phonemes = {
     'ɑ̃': 'an',   # como em 'pão'
@@ -96,9 +97,15 @@ def normalize_text(text):
     return text
 
 def transliterate_and_convert(word):
-    pronunciation = get_pronunciation(word)
-    pronunciation_pt = convert_pronunciation_to_portuguese(pronunciation)
-    return pronunciation_pt
+    try:
+        pronunciation = get_pronunciation(word)
+        logging.info(f"Pronunciation for {word}: {pronunciation}")
+        pronunciation_pt = convert_pronunciation_to_portuguese(pronunciation)
+        logging.info(f"Portuguese pronunciation for {word}: {pronunciation_pt}")
+        return pronunciation_pt
+    except Exception as e:
+        logging.error(f"Error in transliterate_and_convert for word {word}: {e}")
+        return ""
 
 # Load sentences from pickle file and categorize them
 with open('data_de_en_fr.pickle', 'rb') as f:
@@ -209,10 +216,16 @@ def upload():
 
 @app.route('/pronounce', methods=['POST'])
 def pronounce():
-    text = request.form['text']
-    words = text.split()
-    pronunciations = [transliterate_and_convert(word) for word in words]
-    return jsonify({'pronunciations': ' '.join(pronunciations)})
+    try:
+        text = request.form['text']
+        logging.info(f"Received text for pronunciation: {text}")
+        words = text.split()
+        pronunciations = [transliterate_and_convert(word) for word in words]
+        logging.info(f"Pronunciations: {pronunciations}")
+        return jsonify({'pronunciations': ' '.join(pronunciations)})
+    except Exception as e:
+        logging.error(f"Error in /pronounce: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/speak', methods=['POST'])
 def speak():

@@ -85,6 +85,8 @@ def convert_pronunciation_to_portuguese(pronunciation):
                     i += length
                     break
             if not match:
+                # Adicione logs para depuração
+                logging.info(f"Unrecognized phoneme: {word[i]}")
                 mapped_word.append(unidecode(word[i]))
                 i += 1
         pronunciation_mapped.append(''.join(mapped_word))
@@ -236,4 +238,4 @@ def speak():
     return send_file(file_path, as_attachment=True, mimetype='audio/mp3')
 
 if __name__ == '__main__':
-  app.run(port=5000)
+    app.run(port=5000)

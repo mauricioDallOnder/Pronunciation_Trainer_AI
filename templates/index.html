@@ -84,11 +84,33 @@
                     <textarea class="form-control" id="text" name="text"></textarea>
                 </div>
                 <div class="mb-3">
-                    <label for="difficulty" class="form-label">Selecione a Dificuldade:</label>
-                    <select class="form-select" id="difficulty" name="difficulty">
-                        <option value="easy">Fácil</option>
-                        <option value="medium">Médio</option>
-                        <option value="hard">Difícil</option>
+                    <label for="category" class="form-label">Selecione a Categoria (ou escolha 'Aleatório'):</label>
+                    <select class="form-select" id="category" name="category">
+                        <option value="random">Aleatório</option>
+                        <option value="Expressões com Cores">Expressões com Cores</option>
+                        <option value="Expressões com Animais">Expressões com Animais</option>
+                        <option value="Expressões Relacionadas a Esportes">Expressões Relacionadas a Esportes</option>
+                        <option value="Reservando um Hotel">Reservando um Hotel</option>
+                        <option value="No Supermercado">No Supermercado</option>
+                        <option value="Comprando Roupas">Comprando Roupas</option>
+                        <option value="Pedindo Comida no Restaurante">Pedindo Comida no Restaurante</option>
+                        <option value="Em um Café">Em um Café</option>
+                        <option value="Abrindo Conta no Banco">Abrindo Conta no Banco</option>
+                        <option value="Alugando Apartamento">Alugando Apartamento</option>
+                        <option value="Academia">Academia</option>
+                        <option value="Encontrando Amigo no Parque">Encontrando Amigo no Parque</option>
+                        <option value="No Cabeleireiro">No Cabeleireiro</option>
+                        <option value="Na Farmácia">Na Farmácia</option>
+                        <option value="No Trabalho">No Trabalho</option>
+                        <option value="No Correio">No Correio</option>
+                        <option value="No Break para o Lanche">No Break para o Lanche</option>
+                        <option value="Planejando Aniversário">Planejando Aniversário</option>
+                        <option value="No Médico">No Médico</option>
+                        <option value="Fazendo Amigos">Fazendo Amigos</option>
+                        <option value="Renovação de Apartamento">Renovação de Apartamento</option>
+                        <option value="Viagens">Viagens</option>
+                        <option value="Universidade">Universidade</option>
+                        <option value="Entrevista de Emprego">Entrevista de Emprego</option>
                     </select>
                 </div>
                 <button class="btn btn-danger" id="recordButton" onclick="toggleRecording()">
@@ -101,7 +123,7 @@
                     <progress id="uploadProgress" value="0" max="100" style="width: 100%;"></progress>
                 </div>
                 <div class="pronunciation-feedback mt-4">
-                    <h3>Pronúncia em português (Aproximadamente):</h3>
+                    <h3>Pronúncia em português (aproximadamente):</h3>
                     <p id="pronunciation"></p>
                 </div>
                 <div class="result mt-4">
@@ -363,18 +385,22 @@
         }
 
         function generateSentence() {
-            let difficulty = document.getElementById('difficulty').value;
+            let category = document.getElementById('category').value;
             fetch('/get_sentence', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded'
                 },
-                body: 'difficulty=' + encodeURIComponent(difficulty)
+                body: 'category=' + encodeURIComponent(category)
             })
             .then(response => response.json())
             .then(data => {
-                document.getElementById('text').value = data.fr_sentence;
-                fetchPronunciation(data.fr_sentence);
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    document.getElementById('text').value = data.fr_sentence;
+                    fetchPronunciation(data.fr_sentence);
+                }
             });
         }
 

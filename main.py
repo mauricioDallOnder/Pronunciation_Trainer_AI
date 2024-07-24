@@ -115,23 +115,34 @@ def transliterate_and_convert(word):
     pronunciation_pt = convert_pronunciation_to_portuguese(pronunciation)
     return pronunciation_pt
 
-# Load sentences from pickle file and categorize them
-with open('data_de_en_fr.pickle', 'rb') as f:
-    sentences_df = pickle.load(f)
-
-# Convert DataFrame to list of dictionaries
-sentences = sentences_df.to_dict(orient='records')
-
-# Ensure the sentences are in the expected format (list of dictionaries)
-if isinstance(sentences, list) and all(isinstance(s, dict) for s in sentences):
-    easy_sentences = [s for s in sentences if len(s['fr_sentence'].split()) <= 5]
-    medium_sentences = [s for s in sentences if 5 < len(s['fr_sentence'].split()) <= 10]
-    hard_sentences = [s for s in sentences if len(s['fr_sentence'].split()) > 10]
-else:
-    raise ValueError("Unexpected data format in the pickle file. Expected a list of dictionaries.")
+def compare_pronunciations(correct_pronunciation, user_pronunciation, threshold=2):
+    distance = edit_distance_python2(correct_pronunciation, user_pronunciation)
+    return distance <= threshold
 
 def remove_punctuation_end(sentence):
     return sentence.rstrip('.')
+#---------------------------------------------------------------------------
+
+# Load sentences for random selection from data_de_en_fr.pickle
+try:
+    with open('data_de_en_fr.pickle', 'rb') as f:
+        random_sentences_df = pickle.load(f)
+    # Verificar se é um DataFrame e converter para lista de dicionários
+    if isinstance(random_sentences_df, pd.DataFrame):
+        random_sentences = random_sentences_df.to_dict(orient='records')
+    else:
+        random_sentences = random_sentences_df
+except Exception as e:
+    print(f"Erro ao carregar data_de_en_fr.pickle: {e}")
+    random_sentences = []
+
+# Load categorized sentences from frases_categorias.pickle
+try:
+    with open('frases_categorias.pickle', 'rb') as f:
+        categorized_sentences = pickle.load(f)
+except Exception as e:
+    print(f"Erro ao carregar frases_categorias.pickle: {e}")
+    categorized_sentences = {}
 
 @app.route('/')
 def index():
@@ -139,15 +150,29 @@ def index():
 
 @app.route('/get_sentence', methods=['POST'])
 def get_sentence():
-    difficulty = request.form['difficulty']
-    if difficulty == 'easy':
-        sentence = random.choice(easy_sentences)
-    elif difficulty == 'medium':
-        sentence = random.choice(medium_sentences)
-    else:
-        sentence = random.choice(hard_sentences)
-    sentence['fr_sentence'] = remove_punctuation_end(sentence['fr_sentence'])
-    return jsonify(sentence)
+    try:
+        category = request.form.get('category', 'random')
+        
+        if category == 'random':
+            if random_sentences:
+                sentence = random.choice(random_sentences)
+                sentence_text = remove_punctuation_end(sentence.get('fr_sentence', "Frase não encontrada."))
+            else:
+                return jsonify({"error": "Nenhuma frase disponível para seleção aleatória."}), 500
+        else:
+            if category in categorized_sentences:
+                sentence_text = random.choice(categorized_sentences[category])
+                sentence_text = remove_punctuation_end(sentence_text)
+            else:
+                return jsonify({"error": "Categoria não encontrada."}), 400
+
+        return jsonify({'fr_sentence': sentence_text})
+    
+    except Exception as e:
+        print(f"Erro no endpoint /get_sentence: {e}")
+        return jsonify({"error": "Erro interno no servidor."}), 500
+
+#---------------------------------------------------------------------------
 
 @app.route('/upload', methods=['POST'])
 def upload():
@@ -193,8 +218,8 @@ def upload():
         ratio = 0
     else:
         mapped_words, mapped_words_indices = get_best_mapped_words(words_estimated, words_real)
-        ratio = len([i for i in range(len(words_real)) if i < len(mapped_words) and words_real[i] == mapped_words[i]]) / len(words_real)
-    
+        ratio = len([i for i in range(len(words_real)) if i < len(mapped_words) and compare_pronunciations(words_real[i], mapped_words[i])]) / len(words_real)
+
     # Generate HTML with color-coded words
     diff_html = []
     pronunciations = {}
@@ -202,7 +227,7 @@ def upload():
     for real_word, mapped_word in zip(words_real, mapped_words):
         correct_pronunciation = transliterate_and_convert(real_word)
         user_pronunciation = transliterate_and_convert(mapped_word)
-        if real_word == mapped_word:
+        if compare_pronunciations(real_word, mapped_word):
             diff_html.append(f'<span class="word correct" onclick="showPronunciation(\'{real_word}\')">{real_word}</span>')
         else:
             diff_html.append(f'<span class="word incorrect" onclick="showPronunciation(\'{real_word}\')">{real_word}</span>')
@@ -216,7 +241,7 @@ def upload():
             'user': user_pronunciation
         }
     diff_html = ' '.join(diff_html)
-    
+
     # Calculate edit distance
     edit_dist = edit_distance_python2(normalized_transcription, normalized_text)
 

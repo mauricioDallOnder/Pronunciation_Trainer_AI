@@ -13,3 +13,5 @@ jamo
 unicode
 g2pk
 unidecode
+noisereduce
+pydub

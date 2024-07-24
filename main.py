@@ -32,7 +32,7 @@ from gtts import gTTS
 from WordMetrics import edit_distance_python2
 from WordMatching import get_best_mapped_words
 
-app = Flask(__name__, template_folder="../templates", static_folder="../static")
+app = Flask(__name__, template_folder="./templates", static_folder="./static")
 
 # Load the French SST Model
 model_name = "facebook/wav2vec2-large-xlsr-53-french"

@@ -1,8 +1,3 @@
-import numpy as np
-
-# Inicializa o array numpy (necessário para alguns pacotes)
-np._import_array()
-
 import subprocess
 import sys
 
@@ -29,6 +24,7 @@ import re
 import os
 import tempfile
 import wave
+import numpy as np
 import pickle
 import random
 import pandas as pd
@@ -40,6 +36,13 @@ import noisereduce as nr
 
 app = Flask(__name__, template_folder="./templates", static_folder="./static")
 
+# Load the French SST Model
+model_name = "facebook/wav2vec2-large-xlsr-53-french"
+processor = Wav2Vec2Processor.from_pretrained(model_name)
+model = Wav2Vec2ForCTC.from_pretrained(model_name)
+
+# Initialize Epitran for French
+epi = epitran.Epitran('fra-Latn')
 # Load the French SST Model
 model_name = "facebook/wav2vec2-large-xlsr-53-french"
 processor = Wav2Vec2Processor.from_pretrained(model_name)

@@ -15,3 +15,5 @@ g2pk
 unidecode
 noisereduce
 pydub
+librosa
+soxr

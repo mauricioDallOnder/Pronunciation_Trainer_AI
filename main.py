@@ -1,3 +1,8 @@
+import numpy as np
+
+# Inicializa o array numpy (necessário para alguns pacotes)
+np._import_array()
+
 import subprocess
 import sys
 
@@ -24,7 +29,6 @@ import re
 import os
 import tempfile
 import wave
-import numpy as np
 import pickle
 import random
 import pandas as pd

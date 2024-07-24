@@ -11,8 +11,8 @@
     <style>
         body {
             background-color: #4158D0;
-            max-width: 90%;
-            margin: auto;
+            max-width: 100%;
+            margin: 0;
             padding: 20px;
             background-image: url('https://firebasestorage.googleapis.com/v0/b/mauriciodallonder-64688.appspot.com/o/bandeira.jpg?alt=media&token=93383751-b852-4b4a-89e9-82037c09f9da');
             background-size: cover;
@@ -23,23 +23,9 @@
             border-radius: 20px;
             padding: 20px;
             margin-top: 20px;
-            display: flex;
-            justify-content: space-between;
         }
-        .main-content {
-            flex: 0 0 65%;
-            height: fit-content;
-        }
-        .feedback-box {
-            flex: 0 0 30%;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 20px;
-            border-radius: 10px;
-            border: 2px solid #3b5998;
-            margin-left: 20px;
-        }
-        .feedback-box p {
-            margin: 0;
+        .main-content, .feedback-box {
+            margin-bottom: 20px;
         }
         .word {
             cursor: pointer;
@@ -70,46 +56,64 @@
             display: none;
             color: red;
         }
+        @media (min-width: 768px) {
+            .flex-md-row {
+                display: flex;
+                justify-content: space-between;
+            }
+            .main-content {
+                flex: 0 0 65%;
+            }
+            .feedback-box {
+                flex: 0 0 30%;
+                margin-left: 20px;
+                border: 2px solid #3b5998;
+                border-radius: 10px;
+                padding: 20px;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="main-content">
-            <h1 class="mb-4">Treinador de Pronúncia IA</h1>
-            <div class="mb-3">
-                <label for="text" class="form-label">Escreva ou gere um texto abaixo:</label>
-                <textarea class="form-control" id="text" name="text"></textarea>
+        <div class="flex-md-row">
+            <div class="main-content">
+                <h1 class="mb-4">Treinador de Pronúncia IA</h1>
+                <div class="mb-3">
+                    <label for="text" class="form-label">Escreva ou gere um texto abaixo:</label>
+                    <textarea class="form-control" id="text" name="text"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label for="difficulty" class="form-label">Selecione a Dificuldade:</label>
+                    <select class="form-select" id="difficulty" name="difficulty">
+                        <option value="easy">Fácil</option>
+                        <option value="medium">Médio</option>
+                        <option value="hard">Difícil</option>
+                    </select>
+                </div>
+                <button class="btn btn-danger" id="recordButton" onclick="toggleRecording()">
+                    <i class="material-icons" id="recordIcon">mic</i>
+                </button>
+                <button class="btn btn-secondary" onclick="speakText()">Ouvir Texto</button>
+                <button class="btn btn-success" onclick="generateSentence()">Gerar Frase</button>
+                <div class="uploading-message" id="uploadingMessage">
+                    <span id="uploadingText">Enviando áudio... Aguarde.</span>
+                    <progress id="uploadProgress" value="0" max="100" style="width: 100%;"></progress>
+                </div>
+                <div class="pronunciation-feedback mt-4">
+                    <h3>Pronúncia em português (Aproximadamente):</h3>
+                    <p id="pronunciation"></p>
+                </div>
+                <div class="result mt-4">
+                    <h3>Feedback:</h3>
+                    <p>Taxa de Acerto na Pronuncia: <span id="ratio"></span>%</p>
+                    <div class="diff" id="diff"></div>
+                </div>
+                <div id="audioContainer" class="mt-4"></div>
             </div>
-            <div class="mb-3">
-                <label for="difficulty" class="form-label">Selecione a Dificuldade:</label>
-                <select class="form-select" id="difficulty" name="difficulty">
-                    <option value="easy">Fácil</option>
-                    <option value="medium">Médio</option>
-                    <option value="hard">Difícil</option>
-                </select>
+            <div class="feedback-box" id="feedbackBox">
+                <p id="feedbackContent">Clique em uma palavra para ver sua pronúncia.</p>
             </div>
-            <button class="btn btn-danger" id="recordButton" onclick="toggleRecording()">
-                <i class="material-icons" id="recordIcon">mic</i>
-            </button>
-            <button class="btn btn-secondary" onclick="speakText()">Ouvir Texto</button>
-            <button class="btn btn-success" onclick="generateSentence()">Gerar Frase</button>
-            <div class="uploading-message" id="uploadingMessage">
-                <span id="uploadingText">Enviando áudio... Aguarde.</span>
-                <progress id="uploadProgress" value="0" max="100" style="width: 100%;"></progress>
-            </div>
-            <div class="pronunciation-feedback mt-4">
-                <h3>Pronúncia em português (Aproximadamente):</h3>
-                <p id="pronunciation"></p>
-            </div>
-            <div class="result mt-4">
-                <h3>Feedback:</h3>
-                <p>Taxa de Acerto na Pronuncia: <span id="ratio"></span>%</p>
-                <div class="diff" id="diff"></div>
-            </div>
-            <div id="audioContainer" class="mt-4"></div>
-        </div>
-        <div class="feedback-box" id="feedbackBox">
-            <p id="feedbackContent">Clique em uma palavra para ver sua pronúncia.</p>
         </div>
     </div>
 

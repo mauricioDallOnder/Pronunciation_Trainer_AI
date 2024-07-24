@@ -43,13 +43,6 @@ model = Wav2Vec2ForCTC.from_pretrained(model_name)
 
 # Initialize Epitran for French
 epi = epitran.Epitran('fra-Latn')
-# Load the French SST Model
-model_name = "facebook/wav2vec2-large-xlsr-53-french"
-processor = Wav2Vec2Processor.from_pretrained(model_name)
-model = Wav2Vec2ForCTC.from_pretrained(model_name)
-
-# Initialize Epitran for French
-epi = epitran.Epitran('fra-Latn')
 
 def get_pronunciation(word):
     return epi.transliterate(word)

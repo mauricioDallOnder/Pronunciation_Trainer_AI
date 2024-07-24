@@ -31,6 +31,8 @@ import pandas as pd
 from gtts import gTTS
 from WordMetrics import edit_distance_python2
 from WordMatching import get_best_mapped_words
+from pydub import AudioSegment
+import noisereduce as nr
 
 app = Flask(__name__, template_folder="./templates", static_folder="./static")
 
@@ -115,6 +117,11 @@ def transliterate_and_convert(word):
     pronunciation_pt = convert_pronunciation_to_portuguese(pronunciation)
     return pronunciation_pt
 
+def compare_pronunciations(correct_pronunciation, user_pronunciation, threshold=2):
+    distance = edit_distance_python2(correct_pronunciation, user_pronunciation)
+    return distance <= threshold
+
+
 # Load sentences from pickle file and categorize them
 with open('data_de_en_fr.pickle', 'rb') as f:
     sentences_df = pickle.load(f)
@@ -160,8 +167,31 @@ def upload():
         tmp_file_path = tmp_file.name
 
     try:
-        # Read the audio file using wave module
-        with wave.open(tmp_file_path, 'rb') as wav_file:
+        # Process the audio file with pydub
+        audio = AudioSegment.from_wav(tmp_file_path)
+        audio = audio.set_frame_rate(16000)  # Ensure sample rate is 16kHz
+        audio = audio.set_channels(1)  # Ensure mono channel
+        audio = audio.normalize()  # Normalize volume
+
+        # Convert pydub AudioSegment to numpy array for noisereduce
+        samples = np.array(audio.get_array_of_samples())
+        reduced_noise = nr.reduce_noise(y=samples, sr=16000)  # Apply noise reduction
+
+        # Convert the numpy array back to pydub AudioSegment
+        reduced_audio = AudioSegment(
+            reduced_noise.tobytes(),
+            frame_rate=16000,
+            sample_width=samples.dtype.itemsize,
+            channels=1
+        )
+
+        # Save the processed audio to a temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as processed_file:
+            reduced_audio.export(processed_file.name, format="wav")
+            processed_file_path = processed_file.name
+
+        # Read the processed audio file using wave module
+        with wave.open(processed_file_path, 'rb') as wav_file:
             sample_rate = wav_file.getframerate()
             num_frames = wav_file.getnframes()
             waveform = wav_file.readframes(num_frames)
@@ -180,7 +210,8 @@ def upload():
         predicted_ids = torch.argmax(logits, dim=-1)
         transcription = processor.batch_decode(predicted_ids)[0]
     finally:
-        os.remove(tmp_file_path)  # Clean up the temporary file
+        os.remove(tmp_file_path)  # Clean up the original temporary file
+        os.remove(processed_file_path)  # Clean up the processed temporary file
 
     # Normalize texts
     normalized_transcription = normalize_text(transcription)
@@ -193,8 +224,8 @@ def upload():
         ratio = 0
     else:
         mapped_words, mapped_words_indices = get_best_mapped_words(words_estimated, words_real)
-        ratio = len([i for i in range(len(words_real)) if i < len(mapped_words) and words_real[i] == mapped_words[i]]) / len(words_real)
-    
+        ratio = len([i for i in range(len(words_real)) if i < len(mapped_words) and compare_pronunciations(words_real[i], mapped_words[i])]) / len(words_real)
+
     # Generate HTML with color-coded words
     diff_html = []
     pronunciations = {}
@@ -202,7 +233,7 @@ def upload():
     for real_word, mapped_word in zip(words_real, mapped_words):
         correct_pronunciation = transliterate_and_convert(real_word)
         user_pronunciation = transliterate_and_convert(mapped_word)
-        if real_word == mapped_word:
+        if compare_pronunciations(real_word, mapped_word):
             diff_html.append(f'<span class="word correct" onclick="showPronunciation(\'{real_word}\')">{real_word}</span>')
         else:
             diff_html.append(f'<span class="word incorrect" onclick="showPronunciation(\'{real_word}\')">{real_word}</span>')
@@ -216,7 +247,7 @@ def upload():
             'user': user_pronunciation
         }
     diff_html = ' '.join(diff_html)
-    
+
     # Calculate edit distance
     edit_dist = edit_distance_python2(normalized_transcription, normalized_text)
 

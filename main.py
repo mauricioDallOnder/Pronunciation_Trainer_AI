@@ -44,9 +44,6 @@ model = Wav2Vec2ForCTC.from_pretrained(model_name)
 # Initialize Epitran for French
 epi = epitran.Epitran('fra-Latn')
 
-def get_pronunciation(word):
-    return epi.transliterate(word)
-
 # Mapeamento ajustado de fonemas franceses para português
 french_to_portuguese_phonemes = {
     'ɑ̃': 'an',   # como em 'pão'
@@ -85,6 +82,9 @@ french_to_portuguese_phonemes = {
     'ʁ': 'r',     # como em 'carro'
 }
 
+def get_pronunciation(word):
+    return epi.transliterate(word)
+
 def convert_pronunciation_to_portuguese(pronunciation):
     words = pronunciation.split()
     pronunciation_mapped = []
@@ -120,7 +120,6 @@ def transliterate_and_convert(word):
 def compare_pronunciations(correct_pronunciation, user_pronunciation, threshold=2):
     distance = edit_distance_python2(correct_pronunciation, user_pronunciation)
     return distance <= threshold
-
 
 # Load sentences from pickle file and categorize them
 with open('data_de_en_fr.pickle', 'rb') as f:

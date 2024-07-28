@@ -5,6 +5,8 @@ import numpy as np
 from string import punctuation
 from dtwalign import dtw_from_distance_matrix
 import time
+import numpy as np
+from Levenshtein import distance as levenshtein_distance
 
 offset_blank = 1
 TIME_THRESHOLD_MAPPING = 5.0
@@ -171,3 +173,22 @@ def parseLetterErrorsToHTML(word_real, is_leter_correct):
         else:
             word_colored += wrong_color_start + letter + wrong_color_end
     return word_colored
+
+
+
+
+def dtw(words_expected, words_recognized):
+    n = len(words_expected)
+    m = len(words_recognized)
+    dtw_matrix = np.zeros((n+1, m+1))
+    dtw_matrix[0, 1:] = np.inf
+    dtw_matrix[1:, 0] = np.inf
+
+    for i in range(1, n+1):
+        for j in range(1, m+1):
+            cost = levenshtein_distance(words_expected[i-1], words_recognized[j-1])
+            dtw_matrix[i, j] = cost + min(dtw_matrix[i-1, j],    # Inserção
+                                          dtw_matrix[i, j-1],    # Deleção
+                                          dtw_matrix[i-1, j-1])  # Substituição
+
+    return dtw_matrix

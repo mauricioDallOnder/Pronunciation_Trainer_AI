@@ -31,7 +31,8 @@ import pandas as pd
 from gtts import gTTS
 from WordMetrics import edit_distance_python2
 from WordMatching import get_best_mapped_words
-
+from WordMatching import dtw  # Importando a função dtw
+from Levenshtein import distance as levenshtein_distance
 app = Flask(__name__, template_folder="./templates", static_folder="./static")
 
 # Load the French SST Model
@@ -211,26 +212,54 @@ def upload():
     normalized_transcription = normalize_text(transcription)
     normalized_text = normalize_text(text)
 
-    # Calculate word mappings
+    # Estimativas e palavras reais
     words_estimated = normalized_transcription.split()
     words_real = normalized_text.split()
-    if len(words_real) == 0:
-        ratio = 0
-    else:
-        mapped_words, mapped_words_indices = get_best_mapped_words(words_estimated, words_real)
-        ratio = len([i for i in range(len(words_real)) if i < len(mapped_words) and compare_pronunciations(words_real[i], mapped_words[i])]) / len(words_real)
 
-    # Generate HTML with color-coded words
+    # Calcular a matriz de alinhamento usando DTW
+    alignment_matrix = dtw(words_real, words_estimated)
+    
+    # Extraia o caminho de alinhamento
+    n, m = len(words_real), len(words_estimated)
+    i, j = n, m
+    aligned_pairs = []
+
+    while i > 0 or j > 0:
+        if i > 0 and j > 0:
+            if alignment_matrix[i, j] == alignment_matrix[i-1, j-1] + levenshtein_distance(words_real[i-1], words_estimated[j-1]):
+                aligned_pairs.append((words_real[i-1], words_estimated[j-1]))
+                i, j = i - 1, j - 1
+            elif alignment_matrix[i, j] == alignment_matrix[i-1, j] + levenshtein_distance(words_real[i-1], ""):
+                aligned_pairs.append((words_real[i-1], ""))
+                i -= 1
+            else:
+                aligned_pairs.append(("", words_estimated[j-1]))
+                j -= 1
+        elif i > 0:
+            aligned_pairs.append((words_real[i-1], ""))
+            i -= 1
+        elif j > 0:
+            aligned_pairs.append(("", words_estimated[j-1]))
+            j -= 1
+
+    aligned_pairs.reverse()
+
+    # Generate HTML with color-coded words and feedback
     diff_html = []
     pronunciations = {}
     feedback = {}
-    for real_word, mapped_word in zip(words_real, mapped_words):
+    correct_count = 0
+    incorrect_count = 0
+
+    for real_word, mapped_word in aligned_pairs:
         correct_pronunciation = transliterate_and_convert(real_word)
         user_pronunciation = transliterate_and_convert(mapped_word)
         if compare_pronunciations(real_word, mapped_word):
             diff_html.append(f'<span class="word correct" onclick="showPronunciation(\'{real_word}\')">{real_word}</span>')
+            correct_count += 1
         else:
             diff_html.append(f'<span class="word incorrect" onclick="showPronunciation(\'{real_word}\')">{real_word}</span>')
+            incorrect_count += 1
             feedback[real_word] = {
                 'correct': correct_pronunciation,
                 'user': user_pronunciation,
@@ -242,10 +271,19 @@ def upload():
         }
     diff_html = ' '.join(diff_html)
 
-    # Calculate edit distance
-    edit_dist = edit_distance_python2(normalized_transcription, normalized_text)
+    # Calcula a taxa de acerto
+    total_words = correct_count + incorrect_count
+    ratio = (correct_count / total_words) * 100 if total_words > 0 else 0
 
-    return jsonify({'ratio': ratio, 'diff_html': diff_html, 'pronunciations': pronunciations, 'feedback': feedback, 'edit_distance': edit_dist})
+    # Logging para depuração
+    print(f"Correct: {correct_count}, Incorrect: {incorrect_count}, Total: {total_words}, Ratio: {ratio}")
+    formatted_ratio = "{:.2f}".format(ratio)
+    return jsonify({'ratio': formatted_ratio, 'diff_html': diff_html, 'pronunciations': pronunciations, 'feedback': feedback})
+
+
+
+
+
 
 @app.route('/pronounce', methods=['POST'])
 def pronounce():

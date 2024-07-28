@@ -172,7 +172,7 @@
             })
             .then(response => response.json())
             .then(data => {
-                document.getElementById('ratio').innerText = (data.ratio * 100).toFixed(2);
+                document.getElementById('ratioDisplay').innerText = `Taxa de Acerto na Pronuncia: ${data.ratio}%`;
                 document.getElementById('diff').innerHTML = data.diff_html;
                 window.pronunciations = data.pronunciations;  // Save pronunciations for later use
             });
@@ -284,105 +284,124 @@
         }
 
         function uploadRecording(blob) {
-            document.getElementById('uploadingMessage').style.display = 'block';
-            document.getElementById('recordButton').disabled = true;
+    document.getElementById('uploadingMessage').style.display = 'block';
+    document.getElementById('recordButton').disabled = true;
 
-            convertToWav(blob).then(wavBlob => {
-                let textInput = document.getElementById('text');
-                let formData = new FormData();
-                formData.append('audio', wavBlob);
-                formData.append('text', textInput.value);
+    convertToWav(blob).then(wavBlob => {
+        let textInput = document.getElementById('text');
+        let formData = new FormData();
+        formData.append('audio', wavBlob);
+        formData.append('text', textInput.value);
 
-                let xhr = new XMLHttpRequest();
-                xhr.open('POST', '/upload', true);
+        let xhr = new XMLHttpRequest();
+        xhr.open('POST', '/upload', true);
 
-                xhr.upload.addEventListener('progress', function(e) {
-                    if (e.lengthComputable) {
-                        let percentComplete = (e.loaded / e.total) * 100;
-                        document.getElementById('uploadProgress').value = percentComplete;
-                        document.getElementById('uploadingText').innerText = `Enviando áudio... ${Math.round(percentComplete)}% concluído.`;
-                    }
-                });
+        xhr.upload.addEventListener('progress', function(e) {
+            if (e.lengthComputable) {
+                let percentComplete = (e.loaded / e.total) * 100;
+                document.getElementById('uploadProgress').value = percentComplete;
+                document.getElementById('uploadingText').innerText = `Enviando áudio... ${Math.round(percentComplete)}% concluído.`;
+            }
+        });
 
-                xhr.onload = function() {
-                    if (xhr.status === 200) {
-                        let data = JSON.parse(xhr.responseText);
-                        document.getElementById('ratio').innerText = (data.ratio * 100).toFixed(2);
-                        document.getElementById('diff').innerHTML = data.diff_html;
-                        window.pronunciations = data.pronunciations;  // Save pronunciations for later use
-                        document.getElementById('uploadingMessage').style.display = 'none';
-                        document.getElementById('recordButton').disabled = false;
-                    }
-                };
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                let data = JSON.parse(xhr.responseText);
+                document.getElementById('ratio').innerText = (data.ratio * 100).toFixed(2);
+                document.getElementById('diff').innerHTML = data.diff_html;
+                window.pronunciations = data.pronunciations;
+                document.getElementById('uploadingMessage').style.display = 'none';
+                document.getElementById('recordButton').disabled = false;
+            } else {
+                handleUploadError(xhr);
+            }
+        };
 
-                xhr.onerror = function() {
-                    document.getElementById('uploadingText').innerText = 'Erro no envio do áudio. Tente novamente.';
-                    document.getElementById('recordButton').disabled = false;
-                };
+        xhr.onerror = function() {
+            handleUploadError(xhr);
+        };
 
-                xhr.send(formData);
-            });
-        }
+        xhr.send(formData);
+    }).catch(error => {
+        document.getElementById('uploadingMessage').style.display = 'none';
+        document.getElementById('recordButton').disabled = false;
+        alert("Erro ao enviar o áudio. Por favor, tente novamente.");
+    });
+}
+
+function handleUploadError(xhr) {
+    console.error("Erro no envio do áudio:", xhr);
+    document.getElementById('uploadingText').innerText = 'Erro no envio do áudio. Tente novamente.';
+    document.getElementById('uploadingMessage').style.display = 'none';
+    document.getElementById('recordButton').disabled = false;
+}
+
 
         async function convertToWav(blob) {
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const arrayBuffer = await blob.arrayBuffer();
-            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const arrayBuffer = await blob.arrayBuffer();
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-            const wavBuffer = audioBufferToWav(audioBuffer);
-            return new Blob([wavBuffer], { type: 'audio/wav' });
+        const wavBuffer = audioBufferToWav(audioBuffer);
+        return new Blob([wavBuffer], { type: 'audio/wav' });
+    } catch (error) {
+        console.error("Erro na conversão do áudio para WAV:", error);
+        alert("Houve um problema ao processar o áudio. Por favor, tente novamente.");
+        throw error; // Rejeita a promise para evitar upload
+    }
+}
+
+function audioBufferToWav(buffer) {
+    const numOfChan = buffer.numberOfChannels,
+          length = buffer.length * numOfChan * 2 + 44,
+          bufferArr = new ArrayBuffer(length),
+          view = new DataView(bufferArr),
+          channels = [],
+          sampleRate = buffer.sampleRate;
+    let offset = 0,
+        pos = 0;
+
+    function setUint16(data) {
+        view.setUint16(pos, data, true);
+        pos += 2;
+    }
+
+    function setUint32(data) {
+        view.setUint32(pos, data, true);
+        pos += 4;
+    }
+
+    setUint32(0x46464952);  // "RIFF"
+    setUint32(length - 8);  // file length - 8
+    setUint32(0x45564157);  // "WAVE"
+
+    setUint32(0x20746d66);  // "fmt " chunk
+    setUint32(16);          // length = 16
+    setUint16(1);           // PCM (uncompressed)
+    setUint16(numOfChan);
+    setUint32(sampleRate);
+    setUint32(sampleRate * 2 * numOfChan);  // avg. bytes/sec
+    setUint16(numOfChan * 2);               // block-align
+    setUint16(16);          // 16-bit (hardcoded in this demo)
+
+    setUint32(0x61746164);  // "data" - chunk
+    setUint32(length - pos - 4);  // chunk length
+
+    for (let i = 0; i < buffer.numberOfChannels; i++)
+        channels.push(buffer.getChannelData(i));
+
+    while (pos < length) {
+        for (let i = 0; i < numOfChan; i++) {  // interleave channels
+            const sample = Math.max(-1, Math.min(1, channels[i][offset])); // clamp
+            view.setInt16(pos, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true); // convert to PCM
+            pos += 2;
         }
+        offset++; // next source sample
+    }
 
-        function audioBufferToWav(buffer) {
-            const numOfChan = buffer.numberOfChannels,
-                  length = buffer.length * numOfChan * 2 + 44,
-                  bufferArr = new ArrayBuffer(length),
-                  view = new DataView(bufferArr),
-                  channels = [],
-                  sampleRate = buffer.sampleRate;
-            let offset = 0,
-                pos = 0;
-
-            function setUint16(data) {
-                view.setUint16(pos, data, true);
-                pos += 2;
-            }
-
-            function setUint32(data) {
-                view.setUint32(pos, data, true);
-                pos += 4;
-            }
-
-            setUint32(0x46464952);  // "RIFF"
-            setUint32(length - 8);  // file length - 8
-            setUint32(0x45564157);  // "WAVE"
-
-            setUint32(0x20746d66);  // "fmt " chunk
-            setUint32(16);          // length = 16
-            setUint16(1);           // PCM (uncompressed)
-            setUint16(numOfChan);
-            setUint32(sampleRate);
-            setUint32(sampleRate * 2 * numOfChan);  // avg. bytes/sec
-            setUint16(numOfChan * 2);               // block-align
-            setUint16(16);          // 16-bit (hardcoded in this demo)
-
-            setUint32(0x61746164);  // "data" - chunk
-            setUint32(length - pos - 4);  // chunk length
-
-            for (let i = 0; i < buffer.numberOfChannels; i++)
-                channels.push(buffer.getChannelData(i));
-
-            while (pos < length) {
-                for (let i = 0; i < numOfChan; i++) {  // interleave channels
-                    const sample = Math.max(-1, Math.min(1, channels[i][offset])); // clamp
-                    view.setInt16(pos, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true); // convert to PCM
-                    pos += 2;
-                }
-                offset++; // next source sample
-            }
-
-            return bufferArr;
-        }
+    return bufferArr;
+}
 
         function generateSentence() {
             let category = document.getElementById('category').value;

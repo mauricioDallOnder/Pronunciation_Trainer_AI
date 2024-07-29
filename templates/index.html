@@ -307,7 +307,7 @@
         xhr.onload = function() {
             if (xhr.status === 200) {
                 let data = JSON.parse(xhr.responseText);
-                document.getElementById('ratio').innerText = (data.ratio * 100).toFixed(2);
+                document.getElementById('ratio').innerText = data.ratio;
                 document.getElementById('diff').innerHTML = data.diff_html;
                 window.pronunciations = data.pronunciations;
                 document.getElementById('uploadingMessage').style.display = 'none';

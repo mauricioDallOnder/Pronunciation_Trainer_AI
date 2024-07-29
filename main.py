@@ -180,6 +180,9 @@ def upload():
     file = request.files['audio']
     text = request.form['text']
 
+    if not file:
+        return jsonify({'ratio': 0, 'diff_html': '', 'pronunciations': {}, 'feedback': {}})
+
     # Save the uploaded file to a temporary file
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
         tmp_file.write(file.read())
@@ -254,7 +257,8 @@ def upload():
     for real_word, mapped_word in aligned_pairs:
         correct_pronunciation = transliterate_and_convert(real_word)
         user_pronunciation = transliterate_and_convert(mapped_word)
-        if compare_pronunciations(real_word, mapped_word):
+        # Aqui, podemos ajustar o threshold para tornar a comparação mais rigorosa
+        if compare_pronunciations(real_word, mapped_word, threshold=1):
             diff_html.append(f'<span class="word correct" onclick="showPronunciation(\'{real_word}\')">{real_word}</span>')
             correct_count += 1
         else:
@@ -279,6 +283,7 @@ def upload():
     print(f"Correct: {correct_count}, Incorrect: {incorrect_count}, Total: {total_words}, Ratio: {ratio}")
     formatted_ratio = "{:.2f}".format(ratio)
     return jsonify({'ratio': formatted_ratio, 'diff_html': diff_html, 'pronunciations': pronunciations, 'feedback': feedback})
+
 
 
 

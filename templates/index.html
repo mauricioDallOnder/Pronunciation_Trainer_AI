@@ -86,12 +86,7 @@
                 <div class="mb-3">
                     <label for="category" class="form-label">Selecione a Categoria (ou escolha 'Aleatório'):</label>
                     <select class="form-select" id="category" name="category">
-                          <option value="Alugando Apartamento">Alugando Apartamento</option>
-                        <option value="Na Farmácia">Na Farmácia</option>
-                        <option value="No Trabalho">No Trabalho</option>
-                         <option value="No Cabeleireiro">No Cabeleireiro</option>
-                        <option value="No Correio">No Correio</option>
-                        <option value="No Break para o Lanche">No Break para o Lanche</option>
+                        <option value="random">Aleatório</option>
                         <option value="Expressões com Cores">Expressões com Cores</option>
                         <option value="Expressões com Animais">Expressões com Animais</option>
                         <option value="Expressões Relacionadas a Esportes">Expressões Relacionadas a Esportes</option>
@@ -101,24 +96,31 @@
                         <option value="Pedindo Comida no Restaurante">Pedindo Comida no Restaurante</option>
                         <option value="Em um Café">Em um Café</option>
                         <option value="Abrindo Conta no Banco">Abrindo Conta no Banco</option>
+                        <option value="Alugando Apartamento">Alugando Apartamento</option>
                         <option value="Academia">Academia</option>
                         <option value="Encontrando Amigo no Parque">Encontrando Amigo no Parque</option>
+                        <option value="No Cabeleireiro">No Cabeleireiro</option>
+                        <option value="Na Farmácia">Na Farmácia</option>
+                        <option value="No Trabalho">No Trabalho</option>
+                        <option value="No Correio">No Correio</option>
+                        <option value="No Break para o Lanche">No Break para o Lanche</option>
                         <option value="Planejando Aniversário">Planejando Aniversário</option>
                         <option value="No Médico">No Médico</option>
-                        <option value="Fazendo Amigos">Conhecendo novas pessoas</option>
+                        <option value="Fazendo Amigos">Fazendo Amigos</option>
                         <option value="Renovação de Apartamento">Renovação de Apartamento</option>
                         <option value="Viagens">Viagens</option>
                         <option value="Universidade">Universidade</option>
                         <option value="Entrevista de Emprego">Entrevista de Emprego</option>
-                         <option value="random">Aleatório</option>
                     </select>
                 </div>
-                <button class="btn btn-danger" id="recordButton" onclick="toggleRecording()">
-                    <i class="material-icons" id="recordIcon">mic</i>
-                </button>
-                <button class="btn btn-secondary" onclick="speakText()">Ouvir Texto</button>
-                <button class="btn btn-success" onclick="generateSentence()">Gerar Frase</button>
-                <div class="uploading-message" id="uploadingMessage">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-danger" id="recordButton" onclick="toggleRecording()">
+                        <i class="material-icons" id="recordIcon">mic</i>
+                    </button>
+                    <button class="btn btn-secondary" onclick="speakText()">Ouvir Texto</button>
+                    <button class="btn btn-success" onclick="generateSentence()">Gerar Frase</button>
+                </div>
+                <div class="uploading-message mt-3" id="uploadingMessage">
                     <span id="uploadingText">Enviando áudio... Aguarde.</span>
                     <progress id="uploadProgress" value="0" max="100" style="width: 100%;"></progress>
                 </div>
@@ -130,8 +132,14 @@
                     <h3>Feedback:</h3>
                     <p>Taxa de Acerto na Pronuncia: <span id="ratio"></span>%</p>
                     <div class="diff" id="diff"></div>
+                    <br/>
+                    <p>Taxa de Completude: <span id="completeness"></span>%</p>
                 </div>
                 <div id="audioContainer" class="mt-4"></div>
+                <div class="mt-4">
+                    <h3>Gráfico de Desempenho:</h3>
+                    <img id="performanceGraph" src="/performance" class="img-fluid" alt="Gráfico de Desempenho">
+                </div>
             </div>
             <div class="feedback-box" id="feedbackBox">
                 <p id="feedbackContent">Clique em uma palavra para ver sua pronúncia.</p>
@@ -172,9 +180,10 @@
             })
             .then(response => response.json())
             .then(data => {
-                document.getElementById('ratioDisplay').innerText = `Taxa de Acerto na Pronuncia: ${data.ratio}%`;
+                document.getElementById('ratio').innerText = data.ratio;
+                document.getElementById('completeness').innerText = data.completeness_score;
                 document.getElementById('diff').innerHTML = data.diff_html;
-                window.pronunciations = data.pronunciations;  // Save pronunciations for later use
+                window.pronunciations = data.pronunciations;
             });
         }
 
@@ -284,124 +293,124 @@
         }
 
         function uploadRecording(blob) {
-    document.getElementById('uploadingMessage').style.display = 'block';
-    document.getElementById('recordButton').disabled = true;
+            document.getElementById('uploadingMessage').style.display = 'block';
+            document.getElementById('recordButton').disabled = true;
 
-    convertToWav(blob).then(wavBlob => {
-        let textInput = document.getElementById('text');
-        let formData = new FormData();
-        formData.append('audio', wavBlob);
-        formData.append('text', textInput.value);
+            convertToWav(blob).then(wavBlob => {
+                let textInput = document.getElementById('text');
+                let formData = new FormData();
+                formData.append('audio', wavBlob);
+                formData.append('text', textInput.value);
 
-        let xhr = new XMLHttpRequest();
-        xhr.open('POST', '/upload', true);
+                let xhr = new XMLHttpRequest();
+                xhr.open('POST', '/upload', true);
 
-        xhr.upload.addEventListener('progress', function(e) {
-            if (e.lengthComputable) {
-                let percentComplete = (e.loaded / e.total) * 100;
-                document.getElementById('uploadProgress').value = percentComplete;
-                document.getElementById('uploadingText').innerText = `Enviando áudio... ${Math.round(percentComplete)}% concluído.`;
-            }
-        });
+                xhr.upload.addEventListener('progress', function(e) {
+                    if (e.lengthComputable) {
+                        let percentComplete = (e.loaded / e.total) * 100;
+                        document.getElementById('uploadProgress').value = percentComplete;
+                        document.getElementById('uploadingText').innerText = `Enviando áudio... ${Math.round(percentComplete)}% concluído.`;
+                    }
+                });
 
-        xhr.onload = function() {
-            if (xhr.status === 200) {
-                let data = JSON.parse(xhr.responseText);
-                document.getElementById('ratio').innerText = data.ratio;
-                document.getElementById('diff').innerHTML = data.diff_html;
-                window.pronunciations = data.pronunciations;
+                xhr.onload = function() {
+                    if (xhr.status === 200) {
+                        let data = JSON.parse(xhr.responseText);
+                        document.getElementById('ratio').innerText = data.ratio;
+                        document.getElementById('completeness').innerText = data.completeness_score;
+                        document.getElementById('diff').innerHTML = data.diff_html;
+                        window.pronunciations = data.pronunciations;
+                        document.getElementById('uploadingMessage').style.display = 'none';
+                        document.getElementById('recordButton').disabled = false;
+                    } else {
+                        handleUploadError(xhr);
+                    }
+                };
+
+                xhr.onerror = function() {
+                    handleUploadError(xhr);
+                };
+
+                xhr.send(formData);
+            }).catch(error => {
                 document.getElementById('uploadingMessage').style.display = 'none';
                 document.getElementById('recordButton').disabled = false;
-            } else {
-                handleUploadError(xhr);
-            }
-        };
+                alert("Erro ao enviar o áudio. Por favor, tente novamente.");
+            });
+        }
 
-        xhr.onerror = function() {
-            handleUploadError(xhr);
-        };
-
-        xhr.send(formData);
-    }).catch(error => {
-        document.getElementById('uploadingMessage').style.display = 'none';
-        document.getElementById('recordButton').disabled = false;
-        alert("Erro ao enviar o áudio. Por favor, tente novamente.");
-    });
-}
-
-function handleUploadError(xhr) {
-    console.error("Erro no envio do áudio:", xhr);
-    document.getElementById('uploadingText').innerText = 'Erro no envio do áudio. Tente novamente.';
-    document.getElementById('uploadingMessage').style.display = 'none';
-    document.getElementById('recordButton').disabled = false;
-}
-
+        function handleUploadError(xhr) {
+            console.error("Erro no envio do áudio:", xhr);
+            document.getElementById('uploadingText').innerText = 'Erro no envio do áudio. Tente novamente.';
+            document.getElementById('uploadingMessage').style.display = 'none';
+            document.getElementById('recordButton').disabled = false;
+        }
 
         async function convertToWav(blob) {
-    try {
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const arrayBuffer = await blob.arrayBuffer();
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const arrayBuffer = await blob.arrayBuffer();
+                const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-        const wavBuffer = audioBufferToWav(audioBuffer);
-        return new Blob([wavBuffer], { type: 'audio/wav' });
-    } catch (error) {
-        console.error("Erro na conversão do áudio para WAV:", error);
-        alert("Houve um problema ao processar o áudio. Por favor, tente novamente.");
-        throw error; // Rejeita a promise para evitar upload
-    }
-}
-
-function audioBufferToWav(buffer) {
-    const numOfChan = buffer.numberOfChannels,
-          length = buffer.length * numOfChan * 2 + 44,
-          bufferArr = new ArrayBuffer(length),
-          view = new DataView(bufferArr),
-          channels = [],
-          sampleRate = buffer.sampleRate;
-    let offset = 0,
-        pos = 0;
-
-    function setUint16(data) {
-        view.setUint16(pos, data, true);
-        pos += 2;
-    }
-
-    function setUint32(data) {
-        view.setUint32(pos, data, true);
-        pos += 4;
-    }
-
-    setUint32(0x46464952);  // "RIFF"
-    setUint32(length - 8);  // file length - 8
-    setUint32(0x45564157);  // "WAVE"
-
-    setUint32(0x20746d66);  // "fmt " chunk
-    setUint32(16);          // length = 16
-    setUint16(1);           // PCM (uncompressed)
-    setUint16(numOfChan);
-    setUint32(sampleRate);
-    setUint32(sampleRate * 2 * numOfChan);  // avg. bytes/sec
-    setUint16(numOfChan * 2);               // block-align
-    setUint16(16);          // 16-bit (hardcoded in this demo)
-
-    setUint32(0x61746164);  // "data" - chunk
-    setUint32(length - pos - 4);  // chunk length
-
-    for (let i = 0; i < buffer.numberOfChannels; i++)
-        channels.push(buffer.getChannelData(i));
-
-    while (pos < length) {
-        for (let i = 0; i < numOfChan; i++) {  // interleave channels
-            const sample = Math.max(-1, Math.min(1, channels[i][offset])); // clamp
-            view.setInt16(pos, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true); // convert to PCM
-            pos += 2;
+                const wavBuffer = audioBufferToWav(audioBuffer);
+                return new Blob([wavBuffer], { type: 'audio/wav' });
+            } catch (error) {
+                console.error("Erro na conversão do áudio para WAV:", error);
+                alert("Houve um problema ao processar o áudio. Por favor, tente novamente.");
+                throw error;
+            }
         }
-        offset++; // next source sample
-    }
 
-    return bufferArr;
-}
+        function audioBufferToWav(buffer) {
+            const numOfChan = buffer.numberOfChannels,
+                  length = buffer.length * numOfChan * 2 + 44,
+                  bufferArr = new ArrayBuffer(length),
+                  view = new DataView(bufferArr),
+                  channels = [],
+                  sampleRate = buffer.sampleRate;
+            let offset = 0,
+                pos = 0;
+
+            function setUint16(data) {
+                view.setUint16(pos, data, true);
+                pos += 2;
+            }
+
+            function setUint32(data) {
+                view.setUint32(pos, data, true);
+                pos += 4;
+            }
+
+            setUint32(0x46464952);
+            setUint32(length - 8);
+            setUint32(0x45564157);
+
+            setUint32(0x20746d66);
+            setUint32(16);
+            setUint16(1);
+            setUint16(numOfChan);
+            setUint32(sampleRate);
+            setUint32(sampleRate * 2 * numOfChan);
+            setUint16(numOfChan * 2);
+            setUint16(16);
+
+            setUint32(0x61746164);
+            setUint32(length - pos - 4);
+
+            for (let i = 0; i < buffer.numberOfChannels; i++)
+                channels.push(buffer.getChannelData(i));
+
+            while (pos < length) {
+                for (let i = 0; i < numOfChan; i++) {
+                    const sample = Math.max(-1, Math.min(1, channels[i][offset]));
+                    view.setInt16(pos, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+                    pos += 2;
+                }
+                offset++;
+            }
+
+            return bufferArr;
+        }
 
         function generateSentence() {
             let category = document.getElementById('category').value;

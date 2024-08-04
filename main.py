@@ -15,30 +15,78 @@ try:
 except ImportError:
     install('unidecode')
 
-from flask import Flask, request, render_template, jsonify, send_file
-import torch
-import torchaudio
-from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
-import epitran
-import re
-import os
-import tempfile
-import wave
-import numpy as np
-import pickle
-import random
-import pandas as pd
-from gtts import gTTS
-from WordMetrics import edit_distance_python2
-from WordMatching import get_best_mapped_words
-from WordMatching import dtw  # Importando a função dtw
-from Levenshtein import distance as levenshtein_distance
+# Instalação de pacotes adicionais
+try:
+    import epitran
+except ImportError:
+    install('epitran')
+
+try:
+    from flask import Flask, request, render_template, jsonify, send_file
+except ImportError:
+    install('flask')
+
+try:
+    import torch
+    import torchaudio
+except ImportError:
+    install('torch')
+    install('torchaudio')
+
+try:
+    from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
+except ImportError:
+    install('transformers')
+
+try:
+    import matplotlib.pyplot as plt
+    import matplotlib
+    matplotlib.use('Agg')  # Configure o backend para não-GUI
+except ImportError:
+    install('matplotlib')
+    import matplotlib.pyplot as plt
+    import matplotlib
+    matplotlib.use('Agg')  # Configure o backend para não-GUI
+
+try:
+    import re
+    import os
+    import tempfile
+    import wave
+    import numpy as np
+    import pickle
+    import random
+    import pandas as pd
+    from gtts import gTTS
+    from WordMetrics import edit_distance_python2
+    from WordMatching import get_best_mapped_words, dtw
+    from Levenshtein import distance as levenshtein_distance
+except ImportError:
+    install('gtts')
+    install('python-Levenshtein')
+
 app = Flask(__name__, template_folder="./templates", static_folder="./static")
 
 # Load the French SST Model
 model_name = "facebook/wav2vec2-large-xlsr-53-french"
 processor = Wav2Vec2Processor.from_pretrained(model_name)
 model = Wav2Vec2ForCTC.from_pretrained(model_name)
+
+# Load or initialize performance data
+performance_file = 'performance_data.pkl'
+
+def load_performance_data():
+    if os.path.exists(performance_file):
+        with open(performance_file, 'rb') as f:
+            return pickle.load(f)
+    else:
+        return []
+
+def save_performance_data(data):
+    with open(performance_file, 'wb') as f:
+        pickle.dump(data, f)
+
+performance_data = load_performance_data()
 
 # Initialize Epitran for French
 epi = epitran.Epitran('fra-Latn')
@@ -48,81 +96,13 @@ def get_pronunciation(word):
 
 # Mapeamento ajustado de fonemas franceses para português
 french_to_portuguese_phonemes = {
-    'ɑ̃': 'an',   # como em 'pão'
-    'ɛ̃': 'en',   # como em 'vem'
-    'ɔ̃': 'on',   # como em 'som'
-    'œ̃': 'an',   # como em 'um'
-    'ʃ': 'ch',    # como em 'chave'
-    'ʒ': 'j',     # como em 'jogo'
-    'ʀ': 'r',     # como em 'carro'
-    'ɥ': 'u',     # como em 'qu'
-    'ø': 'eu',    # como em 'seu'
-    'œ': 'eu',    # como em 'mel'
-    'ə': 'e',     # como em 'ele'
-    'ɑ': 'a',     # como em 'pá'
-    'ɔ': 'o',     # como em 'só'
-    'e': 'e',     # como em 'ele'
-    'ɛ': 'é',     # como em 'pé'
-    'i': 'i',     # como em 'si'
-    'o': 'ô',     # como em 'avô'
-    'u': 'u',     # como em 'luz'
-    'j': 'i',     # como em 'mais'
-    'w': 'u',     # como em 'qu'
-    'm': 'm',     # como em 'mão'
-    'n': 'n',     # como em 'nó'
-    'p': 'p',     # como em 'pá'
-    'b': 'b',     # como em 'boca'
-    'd': 'd',     # como em 'dado'
-    'f': 'f',     # como em 'foca'
-    'v': 'v',     # como em 'vó'
-    's': 's',     # como em 'sapo'
-    'z': 'z',     # como em 'zebra'
-    't': 't',     # como em 'tá'
-    'k': 'c',     # como em 'casa'
-    'g': 'g',     # como em 'gato'
-    'l': 'l',     # como em 'lago'
-    'ʁ': 'r',     # como em 'carro'
+    'ɑ̃': 'an', 'ɛ̃': 'en', 'ɔ̃': 'on', 'œ̃': 'an', 'ʃ': 'ch',
+    'ʒ': 'j', 'ʀ': 'r', 'ɥ': 'u', 'ø': 'eu', 'œ': 'eu', 'ə': 'e',
+    'ɑ': 'a', 'ɔ': 'o', 'e': 'e', 'ɛ': 'é', 'i': 'i', 'o': 'ô',
+    'u': 'u', 'j': 'i', 'w': 'u', 'm': 'm', 'n': 'n', 'p': 'p',
+    'b': 'b', 'd': 'd', 'f': 'f', 'v': 'v', 's': 's', 'z': 'z',
+    't': 't', 'k': 'c', 'g': 'g', 'l': 'l', 'ʁ': 'r'
 }
-
-def convert_pronunciation_to_portuguese(pronunciation):
-    words = pronunciation.split()
-    pronunciation_mapped = []
-    for word in words:
-        mapped_word = []
-        i = 0
-        while i < len(word):
-            match = None
-            for length in range(3, 0, -1):  # Verifica fonemas de 3 caracteres, 2 caracteres e 1 caractere
-                phoneme = word[i:i + length]
-                if phoneme in french_to_portuguese_phonemes:
-                    match = french_to_portuguese_phonemes[phoneme]
-                    mapped_word.append(match)
-                    i += length
-                    break
-            if not match:
-                mapped_word.append(unidecode(word[i]))
-                i += 1
-        pronunciation_mapped.append(''.join(mapped_word))
-    return ' || '.join(pronunciation_mapped)
-
-def normalize_text(text):
-    text = text.lower()  # Convert to lowercase
-    text = re.sub(r'[^\w\s]', '', text)  # Remove punctuation
-    text = text.strip()  # Remove leading and trailing whitespace
-    return text
-
-def transliterate_and_convert(word):
-    pronunciation = get_pronunciation(word)
-    pronunciation_pt = convert_pronunciation_to_portuguese(pronunciation)
-    return pronunciation_pt
-
-def compare_pronunciations(correct_pronunciation, user_pronunciation, threshold=2):
-    distance = edit_distance_python2(correct_pronunciation, user_pronunciation)
-    return distance <= threshold
-
-def remove_punctuation_end(sentence):
-    return sentence.rstrip('.')
-#---------------------------------------------------------------------------
 
 # Load sentences for random selection from data_de_en_fr.pickle
 try:
@@ -145,43 +125,49 @@ except Exception as e:
     print(f"Erro ao carregar frases_categorias.pickle: {e}")
     categorized_sentences = {}
 
-@app.route('/')
-def index():
-    return render_template('index.html')
+def convert_pronunciation_to_portuguese(pronunciation):
+    words = pronunciation.split()
+    pronunciation_mapped = []
+    for word in words:
+        mapped_word = []
+        i = 0
+        while i < len(word):
+            match = None
+            for length in range(3, 0, -1):
+                phoneme = word[i:i + length]
+                if phoneme in french_to_portuguese_phonemes:
+                    match = french_to_portuguese_phonemes[phoneme]
+                    mapped_word.append(match)
+                    i += length
+                    break
+            if not match:
+                mapped_word.append(unidecode(word[i]))
+                i += 1
+        pronunciation_mapped.append(''.join(mapped_word))
+    return ' || '.join(pronunciation_mapped)
 
-@app.route('/get_sentence', methods=['POST'])
-def get_sentence():
-    try:
-        category = request.form.get('category', 'random')
-        
-        if category == 'random':
-            if random_sentences:
-                sentence = random.choice(random_sentences)
-                sentence_text = remove_punctuation_end(sentence.get('fr_sentence', "Frase não encontrada."))
-            else:
-                return jsonify({"error": "Nenhuma frase disponível para seleção aleatória."}), 500
-        else:
-            if category in categorized_sentences:
-                sentence_text = random.choice(categorized_sentences[category])
-                sentence_text = remove_punctuation_end(sentence_text)
-            else:
-                return jsonify({"error": "Categoria não encontrada."}), 400
+def normalize_text(text):
+    text = text.lower()
+    text = re.sub(r'[^\w\s]', '', text)
+    text = text.strip()
+    return text
 
-        return jsonify({'fr_sentence': sentence_text})
-    
-    except Exception as e:
-        print(f"Erro no endpoint /get_sentence: {e}")
-        return jsonify({"error": "Erro interno no servidor."}), 500
+def transliterate_and_convert(word):
+    pronunciation = get_pronunciation(word)
+    pronunciation_pt = convert_pronunciation_to_portuguese(pronunciation)
+    return pronunciation_pt
 
-#---------------------------------------------------------------------------
+def compare_pronunciations(correct_pronunciation, user_pronunciation, threshold=2):
+    distance = edit_distance_python2(correct_pronunciation, user_pronunciation)
+    return distance <= threshold
+
+def remove_punctuation_end(sentence):
+    return sentence.rstrip('.')
 
 @app.route('/upload', methods=['POST'])
 def upload():
     file = request.files['audio']
     text = request.form['text']
-
-    if not file:
-        return jsonify({'ratio': 0, 'diff_html': '', 'pronunciations': {}, 'feedback': {}})
 
     # Save the uploaded file to a temporary file
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
@@ -194,22 +180,22 @@ def upload():
             sample_rate = wav_file.getframerate()
             num_frames = wav_file.getnframes()
             waveform = wav_file.readframes(num_frames)
-            waveform = np.frombuffer(waveform, dtype=np.int16).astype(np.float32) / 32768.0  # Normalize audio
-            waveform = torch.tensor(waveform).unsqueeze(0)  # Add batch dimension
+            waveform = np.frombuffer(waveform, dtype=np.int16).astype(np.float32) / 32768.0
+            waveform = torch.tensor(waveform).unsqueeze(0)
 
         # Resample if necessary
         if sample_rate != 16000:
             waveform = torchaudio.transforms.Resample(orig_freq=sample_rate, new_freq=16000)(waveform)
 
-        waveform = waveform.squeeze(0)  # Remove the batch dimension for a single example
+        waveform = waveform.squeeze(0)
         inputs = processor(waveform, sampling_rate=16000, return_tensors="pt", padding=True)
         with torch.no_grad():
             logits = model(inputs.input_values).logits
-        
+
         predicted_ids = torch.argmax(logits, dim=-1)
         transcription = processor.batch_decode(predicted_ids)[0]
     finally:
-        os.remove(tmp_file_path)  # Clean up the temporary file
+        os.remove(tmp_file_path)
 
     # Normalize texts
     normalized_transcription = normalize_text(transcription)
@@ -221,7 +207,7 @@ def upload():
 
     # Calcular a matriz de alinhamento usando DTW
     alignment_matrix = dtw(words_real, words_estimated)
-    
+
     # Extraia o caminho de alinhamento
     n, m = len(words_real), len(words_estimated)
     i, j = n, m
@@ -257,8 +243,7 @@ def upload():
     for real_word, mapped_word in aligned_pairs:
         correct_pronunciation = transliterate_and_convert(real_word)
         user_pronunciation = transliterate_and_convert(mapped_word)
-        # Aqui, podemos ajustar o threshold para tornar a comparação mais rigorosa
-        if compare_pronunciations(real_word, mapped_word, threshold=1):
+        if compare_pronunciations(real_word, mapped_word):
             diff_html.append(f'<span class="word correct" onclick="showPronunciation(\'{real_word}\')">{real_word}</span>')
             correct_count += 1
         else:
@@ -275,20 +260,62 @@ def upload():
         }
     diff_html = ' '.join(diff_html)
 
-    # Calcula a taxa de acerto
+    # Calcula a taxa de acerto e completude
     total_words = correct_count + incorrect_count
     ratio = (correct_count / total_words) * 100 if total_words > 0 else 0
+    completeness_score = (len(words_estimated) / len(words_real)) * 100
+
+    # Armazena os resultados diários
+    performance_data.append({
+        'date': pd.Timestamp.now().strftime('%Y-%m-%d'),
+        'correct': correct_count,
+        'incorrect': incorrect_count,
+        'ratio': ratio,
+        'completeness_score': completeness_score,
+        'sentence': text
+    })
+    save_performance_data(performance_data)
 
     # Logging para depuração
     print(f"Correct: {correct_count}, Incorrect: {incorrect_count}, Total: {total_words}, Ratio: {ratio}")
     formatted_ratio = "{:.2f}".format(ratio)
-    return jsonify({'ratio': formatted_ratio, 'diff_html': diff_html, 'pronunciations': pronunciations, 'feedback': feedback})
+    formatted_completeness = "{:.2f}".format(completeness_score)
 
+    return jsonify({
+        'ratio': formatted_ratio,
+        'diff_html': diff_html,
+        'pronunciations': pronunciations,
+        'feedback': feedback,
+        'completeness_score': formatted_completeness
+    })
 
+@app.route('/')
+def index():
+    return render_template('index.html')
 
+@app.route('/get_sentence', methods=['POST'])
+def get_sentence():
+    try:
+        category = request.form.get('category', 'random')
 
+        if category == 'random':
+            if random_sentences:
+                sentence = random.choice(random_sentences)
+                sentence_text = remove_punctuation_end(sentence.get('fr_sentence', "Frase não encontrada."))
+            else:
+                return jsonify({"error": "Nenhuma frase disponível para seleção aleatória."}), 500
+        else:
+            if category in categorized_sentences:
+                sentence_text = random.choice(categorized_sentences[category])
+                sentence_text = remove_punctuation_end(sentence_text)
+            else:
+                return jsonify({"error": "Categoria não encontrada."}), 400
 
+        return jsonify({'fr_sentence': sentence_text})
 
+    except Exception as e:
+        print(f"Erro no endpoint /get_sentence: {e}")
+        return jsonify({"error": "Erro interno no servidor."}), 500
 
 @app.route('/pronounce', methods=['POST'])
 def pronounce():
@@ -304,6 +331,44 @@ def speak():
     file_path = tempfile.mktemp(suffix=".mp3")
     tts.save(file_path)
     return send_file(file_path, as_attachment=True, mimetype='audio/mp3')
+
+@app.route('/performance', methods=['GET'])
+def performance():
+    # Agrupar dados por data
+    df = pd.DataFrame(performance_data)
+    grouped = df.groupby('date').agg({
+        'correct': 'sum',
+        'incorrect': 'sum',
+        'ratio': 'mean'
+    }).reset_index()
+
+    dates = grouped['date']
+    corrects = grouped['correct']
+    incorrects = grouped['incorrect']
+    ratios = grouped['ratio']
+
+    x = np.arange(len(dates))  # the label locations
+    width = 0.3  # the width of the bars
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    rects1 = ax.bar(x - width / 2, corrects, width, label='Acertos', color='green')
+    rects2 = ax.bar(x + width / 2, incorrects, width, label='Erros', color='red')
+
+    ax.set_xlabel('Data')
+    ax.set_ylabel('Percentagem')
+    ax.set_title('Desempenho Diário')
+    ax.set_xticks(x)
+    ax.set_xticklabels(dates, rotation=45)  # Rotaciona os labels do eixo X para melhor leitura
+    ax.set_ylim(0, 100)
+    ax.legend()
+
+    fig.tight_layout()
+
+    graph_path = 'static/performance_graph.png'
+    plt.savefig(graph_path, bbox_inches='tight')  # Ajusta o gráfico para que tudo fique visível
+    plt.close()
+
+    return send_file(graph_path, mimetype='image/png')
 
 if __name__ == '__main__':
     app.run(debug=True)

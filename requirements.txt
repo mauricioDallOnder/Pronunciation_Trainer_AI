@@ -18,3 +18,4 @@ pydub
 librosa
 soxr
 Levenshtein
+matplotlib

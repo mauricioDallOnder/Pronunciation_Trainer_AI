@@ -96,13 +96,42 @@ def get_pronunciation(word):
 
 # Mapeamento ajustado de fonemas franceses para português
 french_to_portuguese_phonemes = {
-    'ɑ̃': 'an', 'ɛ̃': 'en', 'ɔ̃': 'on', 'œ̃': 'an', 'ʃ': 'ch',
-    'ʒ': 'j', 'ʀ': 'r', 'ɥ': 'u', 'ø': 'eu', 'œ': 'eu', 'ə': 'e',
-    'ɑ': 'a', 'ɔ': 'o', 'e': 'e', 'ɛ': 'é', 'i': 'i', 'o': 'ô',
-    'u': 'u', 'j': 'i', 'w': 'u', 'm': 'm', 'n': 'n', 'p': 'p',
-    'b': 'b', 'd': 'd', 'f': 'f', 'v': 'v', 's': 's', 'z': 'z',
-    't': 't', 'k': 'c', 'g': 'g', 'l': 'l', 'ʁ': 'r'
+    'ɑ̃': 'ã',   # Como em "mãe"
+    'ɛ̃': 'ẽ',   # Como em "tem"
+    'ɔ̃': 'õ',   # Como em "bom"
+    'œ̃': 'ã',   # Similar a "mãe" (mais próximo do som nasal)
+    'ʃ': 'ch',   # Como em "chá"
+    'ʒ': 'j',    # Como em "jeito"
+    'ʀ': 'rr',    # Como em "carro" (r uvular, som padrão em Portugal e comum em algumas regiões do Brasil)
+    'ɥ': 'ui',    # Semivogal, como em "huit" (aproximado ao som de "ui" no português, ex: "fui")
+    'ø': 'e',    # Como em "peur" (aproximado, mas não exatamente igual ao "e" fechado em português)
+    'œ': 'é',    # Como em "fleur" (intermediário entre "é" e "ê")
+    'ə': 'e',    # Como em "le" (vogal neutra, semelhante ao "e" átono em "cabeça")
+    'ɑ': 'a',    # Como em "pá" (som mais aberto)
+    'ɔ': 'ó',    # Como em "só"
+    'e': 'ê',    # Como em "vê"
+    'ɛ': 'é',    # Como em "pé"
+    'i': 'i',    # Como em "vi"
+    'o': 'ô',    # Como em "pôr"
+    'u': 'u',    # Como em "tu"
+    'j': 'i',    # Como em "sim" (semivogal, ex: "pai")
+    'w': 'u',    # Como em "quase" (semivogal, ex: "quarto")
+    'm': 'm',    # Como em "mão"
+    'n': 'n',    # Como em "não"
+    'p': 'p',    # Como em "pato"
+    'b': 'b',    # Como em "boca"
+    'd': 'd',    # Como em "dado"
+    'f': 'f',    # Como em "faca"
+    'v': 'v',    # Como em "vaca"
+    's': 's',    # Como em "sapo" (s surdo)
+    'z': 'z',    # Como em "zero" (s sonoro)
+    't': 't',    # Como em "taco"
+    'k': 'k',    # Como em "casa" (som de /k/)
+    'g': 'g',    # Como em "gato"
+    'l': 'l',    # Como em "lado" (l claro)
+    'ʁ': 'r'     # Como em "rato" (som gutural, r francês clássico)
 }
+
 
 # Load sentences for random selection from data_de_en_fr.pickle
 try:

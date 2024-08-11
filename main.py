@@ -94,6 +94,49 @@ epi = epitran.Epitran('fra-Latn')
 def get_pronunciation(word):
     return epi.transliterate(word)
 
+# Funções para melhorar a transcrição fonética
+
+def omit_schwa(pronunciation):
+    # Verifica a presença de sequências que costumam omitir o 'e'
+    if "ement" in pronunciation:
+        return pronunciation.replace("ement", "mã")
+    return pronunciation
+
+def normalize_vowels(pronunciation):
+    # Normaliza vogais para consistência
+    pronunciation = pronunciation.replace("ó", "ô")  # Exemplo de ajuste
+    return pronunciation
+
+def handle_special_cases(pronunciation):
+    # Regras especiais para contextos específicos
+    if "informations" in pronunciation:
+        pronunciation = pronunciation.replace("ʒ", "j")
+    return pronunciation
+
+def convert_pronunciation_to_portuguese(pronunciation):
+    pronunciation = omit_schwa(pronunciation)
+    pronunciation = normalize_vowels(pronunciation)
+    pronunciation = handle_special_cases(pronunciation)
+    words = pronunciation.split()
+    pronunciation_mapped = []
+    for word in words:
+        mapped_word = []
+        i = 0
+        while i < len(word):
+            match = None
+            for length in range(3, 0, -1):
+                phoneme = word[i:i + length]
+                if phoneme in french_to_portuguese_phonemes:
+                    match = french_to_portuguese_phonemes[phoneme]
+                    mapped_word.append(match)
+                    i += length
+                    break
+            if not match:
+                mapped_word.append(unidecode(word[i]))
+                i += 1
+        pronunciation_mapped.append(''.join(mapped_word))
+    return ' || '.join(pronunciation_mapped)
+
 # Mapeamento ajustado de fonemas franceses para português
 french_to_portuguese_phonemes = {
     'ɑ̃': 'ã',   # Como em "mãe"
@@ -102,9 +145,9 @@ french_to_portuguese_phonemes = {
     'œ̃': 'ã',   # Similar a "mãe" (mais próximo do som nasal)
     'ʃ': 'ch',   # Como em "chá"
     'ʒ': 'j',    # Como em "jeito"
-    'ʀ': 'rr',    # Como em "carro" (r uvular, som padrão em Portugal e comum em algumas regiões do Brasil)
-    'ɥ': 'ui',    # Semivogal, como em "huit" (aproximado ao som de "ui" no português, ex: "fui")
-    'ø': 'e',    # Como em "peur" (aproximado, mas não exatamente igual ao "e" fechado em português)
+    'ʀ': 'rr',   # Como em "carro" (r uvular, som padrão em Portugal e comum em algumas regiões do Brasil)
+    'ɥ': 'ui',   # Semivogal, como em "huit" (aproximado ao som de "ui" no português, ex: "fui")
+    'ø': 'ê',    # Como em "peur" (intermediário entre "é" e "ê")
     'œ': 'é',    # Como em "fleur" (intermediário entre "é" e "ê")
     'ə': 'e',    # Como em "le" (vogal neutra, semelhante ao "e" átono em "cabeça")
     'ɑ': 'a',    # Como em "pá" (som mais aberto)
@@ -129,9 +172,8 @@ french_to_portuguese_phonemes = {
     'k': 'k',    # Como em "casa" (som de /k/)
     'g': 'g',    # Como em "gato"
     'l': 'l',    # Como em "lado" (l claro)
-    'ʁ': 'r'     # Como em "rato" (som gutural, r francês clássico)
+    'ʁ': 'rr',   # Como em "carro" (r uvular)
 }
-
 
 # Load sentences for random selection from data_de_en_fr.pickle
 try:
@@ -153,27 +195,6 @@ try:
 except Exception as e:
     print(f"Erro ao carregar frases_categorias.pickle: {e}")
     categorized_sentences = {}
-
-def convert_pronunciation_to_portuguese(pronunciation):
-    words = pronunciation.split()
-    pronunciation_mapped = []
-    for word in words:
-        mapped_word = []
-        i = 0
-        while i < len(word):
-            match = None
-            for length in range(3, 0, -1):
-                phoneme = word[i:i + length]
-                if phoneme in french_to_portuguese_phonemes:
-                    match = french_to_portuguese_phonemes[phoneme]
-                    mapped_word.append(match)
-                    i += length
-                    break
-            if not match:
-                mapped_word.append(unidecode(word[i]))
-                i += 1
-        pronunciation_mapped.append(''.join(mapped_word))
-    return ' || '.join(pronunciation_mapped)
 
 def normalize_text(text):
     text = text.lower()
